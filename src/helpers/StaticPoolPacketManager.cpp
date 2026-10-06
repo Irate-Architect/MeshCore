@@ -57,6 +57,16 @@ mesh::Packet* PacketQueue::removeByIdx(int i) {
   return item;
 }
 
+mesh::Packet* PacketQueue::removeOverdueFlood(uint32_t now, uint32_t max_overdue) {
+  for (int j = 0; j < _num; j++) {
+    if ((int32_t)(now - _schedule_table[j]) <= (int32_t)max_overdue) continue;   // not overdue (or still in future)
+    if (_table[j]->isRouteFlood()) {
+      return removeByIdx(j);
+    }
+  }
+  return NULL;
+}
+
 bool PacketQueue::add(mesh::Packet* packet, uint8_t priority, uint32_t scheduled_for) {
   if (_num == _size) {
     return false;
@@ -116,6 +126,9 @@ mesh::Packet* StaticPoolPacketManager::getOutboundByIdx(int i) {
 }
 mesh::Packet* StaticPoolPacketManager::removeOutboundByIdx(int i) {
   return send_queue.removeByIdx(i);
+}
+mesh::Packet* StaticPoolPacketManager::removeOverdueFlood(uint32_t now, uint32_t max_overdue) {
+  return send_queue.removeOverdueFlood(now, max_overdue);
 }
 
 void StaticPoolPacketManager::queueInbound(mesh::Packet* packet, uint32_t scheduled_for) {

@@ -272,7 +272,19 @@ void Dispatcher::processRecvPacket(Packet* pkt) {
   }
 }
 
+void Dispatcher::dropOverdueFloods() {
+  uint32_t max_overdue = getMaxFloodTxOverdue();
+  if (max_overdue == 0) return;   // disabled
+
+  Packet* pkt;
+  while ((pkt = _mgr->removeOverdueFlood(_ms->getMillis(), max_overdue)) != NULL) {
+    MESH_DEBUG_PRINTLN("%s Dispatcher::checkSend(): dropping overdue FLOOD packet (type=%d)", getLogDateTime(), (uint32_t)pkt->getPayloadType());
+    releasePacket(pkt);  // return to pool
+  }
+}
+
 void Dispatcher::checkSend() {
+  dropOverdueFloods();   // stale floods would just re-flood the mesh, as neighbours have forgotten them
   if (_mgr->getOutboundCount(_ms->getMillis()) == 0) return;
   
   updateTxBudget();

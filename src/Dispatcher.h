@@ -96,6 +96,8 @@ public:
   virtual int getFreeCount() const = 0;
   virtual Packet* getOutboundByIdx(int i) = 0;
   virtual Packet* removeOutboundByIdx(int i) = 0;
+  // remove (and return) a queued FLOOD packet whose scheduled send time passed more than 'max_overdue' millis ago
+  virtual Packet* removeOverdueFlood(uint32_t now, uint32_t max_overdue) { return NULL; }
   virtual void queueInbound(Packet* packet, uint32_t scheduled_for) = 0;
   virtual Packet* getNextInbound(uint32_t now) = 0;
 };
@@ -106,6 +108,12 @@ typedef uint32_t  DispatcherAction;
 #define ACTION_MANUAL_HOLD       (1)
 #define ACTION_RETRANSMIT(pri)   (((uint32_t)1 + (pri))<<24)
 #define ACTION_RETRANSMIT_DELAYED(pri, _delay)  ((((uint32_t)1 + (pri))<<24) | (_delay))
+
+// Max millis a queued FLOOD packet may be past its scheduled send time before it is dropped.
+// Neighbours' 'seen' tables will have long forgotten it, so a late send just re-floods an old packet.
+#ifndef MAX_FLOOD_TX_OVERDUE_MILLIS
+  #define MAX_FLOOD_TX_OVERDUE_MILLIS   60000   // 60 seconds
+#endif
 
 #define ERR_EVENT_FULL              (1 << 0)
 #define ERR_EVENT_CAD_TIMEOUT       (1 << 1)
@@ -131,6 +139,7 @@ class Dispatcher {
 
   void processRecvPacket(Packet* pkt);
   void updateTxBudget();
+  void dropOverdueFloods();
 
 protected:
   PacketManager* _mgr;
@@ -171,6 +180,7 @@ protected:
   virtual bool getCADEnabled() const { return false; }    // hardware CAD disabled by default
   virtual int getAGCResetInterval() const { return 0; }    // disabled by default
   virtual unsigned long getDutyCycleWindowMs() const { return 3600000; }
+  virtual uint32_t getMaxFloodTxOverdue() const { return MAX_FLOOD_TX_OVERDUE_MILLIS; }   // zero = never drop
 
 public:
   void begin();
