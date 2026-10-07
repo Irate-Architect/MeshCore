@@ -109,12 +109,6 @@ typedef uint32_t  DispatcherAction;
 #define ACTION_RETRANSMIT(pri)   (((uint32_t)1 + (pri))<<24)
 #define ACTION_RETRANSMIT_DELAYED(pri, _delay)  ((((uint32_t)1 + (pri))<<24) | (_delay))
 
-// Max millis a queued FLOOD packet may be past its scheduled send time before it is dropped.
-// Neighbours' 'seen' tables will have long forgotten it, so a late send just re-floods an old packet.
-#ifndef MAX_FLOOD_TX_OVERDUE_MILLIS
-  #define MAX_FLOOD_TX_OVERDUE_MILLIS   60000   // 60 seconds
-#endif
-
 #define ERR_EVENT_FULL              (1 << 0)
 #define ERR_EVENT_CAD_TIMEOUT       (1 << 1)
 #define ERR_EVENT_STARTRX_TIMEOUT   (1 << 2)
@@ -180,7 +174,7 @@ protected:
   virtual bool getCADEnabled() const { return false; }    // hardware CAD disabled by default
   virtual int getAGCResetInterval() const { return 0; }    // disabled by default
   virtual unsigned long getDutyCycleWindowMs() const { return 3600000; }
-  virtual uint32_t getMaxFloodTxOverdue() const { return MAX_FLOOD_TX_OVERDUE_MILLIS; }   // zero = never drop
+  virtual uint32_t getMaxFloodTxOverdue() const;   // zero = never drop
 
 public:
   void begin();

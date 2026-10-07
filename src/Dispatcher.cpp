@@ -16,6 +16,12 @@ namespace mesh {
   #define NOISE_FLOOR_CALIB_INTERVAL   2000     // 2 seconds
 #endif
 
+// max millis a queued FLOOD packet may be past its scheduled send time before it is dropped.
+// Neighbours' 'seen' tables will have long forgotten it, so a late send just re-floods an old packet.
+#ifndef MAX_FLOOD_TX_OVERDUE_MILLIS
+  #define MAX_FLOOD_TX_OVERDUE_MILLIS   60000   // 60 seconds
+#endif
+
 void Dispatcher::begin() {
   n_sent_flood = n_sent_direct = 0;
   n_recv_flood = n_recv_direct = 0;
@@ -61,6 +67,9 @@ uint32_t Dispatcher::getCADFailRetryDelay() const {
 }
 uint32_t Dispatcher::getCADFailMaxDuration() const {
   return 4000;   // 4 seconds
+}
+uint32_t Dispatcher::getMaxFloodTxOverdue() const {
+  return MAX_FLOOD_TX_OVERDUE_MILLIS;
 }
 
 void Dispatcher::loop() {

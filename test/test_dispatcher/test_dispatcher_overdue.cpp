@@ -27,15 +27,20 @@ public:
   unsigned long getMillis() override { return now; }
 };
 
+static const uint32_t LIMIT = 60000;   // limit used by these tests (same as the default)
+
 class TestDispatcher : public Dispatcher {
 public:
-  uint32_t max_overdue = MAX_FLOOD_TX_OVERDUE_MILLIS;
+  uint32_t max_overdue = LIMIT;
+  bool use_default_limit = false;
 
   TestDispatcher(Radio& radio, MillisecondClock& ms, PacketManager& mgr) : Dispatcher(radio, ms, mgr) { }
 
   DispatcherAction onRecvPacket(Packet* pkt) override { return ACTION_RELEASE; }
   float getAirtimeBudgetFactor() const override { return 0.0f; }   // 100% duty cycle: never budget-limited
-  uint32_t getMaxFloodTxOverdue() const override { return max_overdue; }
+  uint32_t getMaxFloodTxOverdue() const override {
+    return use_default_limit ? Dispatcher::getMaxFloodTxOverdue() : max_overdue;
+  }
 
   void queue(uint8_t route_type, uint8_t id, uint8_t priority, uint32_t delay_millis = 0) {
     Packet* p = obtainNewPacket();
@@ -68,6 +73,11 @@ protected:
   }
 };
 
+TEST_F(DispatcherOverdueTest, DefaultLimitIs60Seconds) {
+  disp.use_default_limit = true;
+  EXPECT_EQ(60000u, disp.getMaxFloodTxOverdue());
+}
+
 TEST_F(DispatcherOverdueTest, FloodSentWhenOnTime) {
   disp.queue(ROUTE_TYPE_FLOOD, 0xF1, 1);
   step(10);
@@ -76,13 +86,13 @@ TEST_F(DispatcherOverdueTest, FloodSentWhenOnTime) {
 
 TEST_F(DispatcherOverdueTest, FloodSentWhenOverdueButWithinLimit) {
   disp.queue(ROUTE_TYPE_FLOOD, 0xF1, 1);
-  step(MAX_FLOOD_TX_OVERDUE_MILLIS - 1);
+  step(LIMIT - 1);
   EXPECT_TRUE(wasSent(0xF1));
 }
 
 TEST_F(DispatcherOverdueTest, OverdueFloodDroppedNotSent) {
   disp.queue(ROUTE_TYPE_FLOOD, 0xF1, 1);
-  step(MAX_FLOOD_TX_OVERDUE_MILLIS + 1);
+  step(LIMIT + 1);
   step(10);
 
   EXPECT_FALSE(wasSent(0xF1));
@@ -92,7 +102,7 @@ TEST_F(DispatcherOverdueTest, OverdueFloodDroppedNotSent) {
 
 TEST_F(DispatcherOverdueTest, OverdueTransportFloodDropped) {
   disp.queue(ROUTE_TYPE_TRANSPORT_FLOOD, 0xF1, 1);
-  step(MAX_FLOOD_TX_OVERDUE_MILLIS + 1);
+  step(LIMIT + 1);
   EXPECT_FALSE(wasSent(0xF1));
   EXPECT_EQ(POOL_SIZE, mgr.getFreeCount());
 }
@@ -135,7 +145,7 @@ static void runStarvation(TestDispatcher& disp, unsigned long& now, uint32_t max
 }
 
 TEST_F(DispatcherOverdueTest, StarvedFloodIsDroppedInsteadOfSentLate) {
-  runStarvation(disp, clock.now, MAX_FLOOD_TX_OVERDUE_MILLIS);
+  runStarvation(disp, clock.now, LIMIT);
   EXPECT_FALSE(wasSent(0xF1));
   EXPECT_EQ(0, mgr.getOutboundTotal());
   EXPECT_EQ(POOL_SIZE, mgr.getFreeCount());
